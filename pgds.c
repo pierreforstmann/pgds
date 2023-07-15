@@ -257,11 +257,17 @@ static void pgds_analyze(ParseState *pstate, Query *query)
 static void pgds_analyze(ParseState *pstate, Query *query, JumbleState *js)
 #endif
 {
-	StringInfoData buf_select;
+	StringInfoData buf_select1;
+	StringInfoData buf_select2;
 	StringInfoData buf_analyze;
 	int ret;
 	int nr;
-
+	ListCell *cell;
+	Oid	rel_id;
+	SPITupleTable *tuptable;
+	TupleDesc tupdesc;
+	char *count_val;
+		
 	elog(DEBUG1,"pgds: pgds_analyze: entry: %s",pstate->p_sourcetext);
 
 	/* pstate->p_sourcetext is the current query text */	
@@ -270,26 +276,65 @@ static void pgds_analyze(ParseState *pstate, Query *query, JumbleState *js)
 	if (called == 0)
 	{
 		called = 1;
-		initStringInfo(&buf_select);
-		appendStringInfo(&buf_select, 
-						 " select count(*) from (select schemaname, tablename, attname, n_distinct, count(*)" 
-						                         "from pg_stats where tablename='t'" 
-										         "group by schemaname, tablename, attname, n_distinct) s;");
+		
+		foreach(cell, pstate->p_rtable)
+		{
 
-		initStringInfo(&buf_analyze);
-		appendStringInfo(&buf_analyze, "analyze verbose t;");
+            RangeTblEntry *rte = (RangeTblEntry *) lfirst(cell);
+			rel_id = rte->relid;
+			elog(DEBUG1,"pgds: pgds_analyze: rel_id: %d", rel_id);
 
-		SPI_connect();
-		ret = SPI_execute(buf_select.data, false, 0);
-		if (ret != SPI_OK_SELECT)
-			elog(FATAL, "cannot select from pg_stats: error code %d", ret);
-		nr = SPI_processed;		
-		elog(DEBUG1,"pgds: pgds_analyze: found %d rows in pg_stats query",  nr);
+			/*
+			** rel_id == 0 for some catalog queries ?
+			*/
+			if (rel_id == 0)
+				continue;
 
-		ret = SPI_execute(buf_analyze.data, false, 0);
-		if (ret != SPI_OK_SELECT)
-			elog(FATAL, "cannot run analyze: error code %d", ret);
-		SPI_finish();
+			initStringInfo(&buf_select1);
+			appendStringInfo(&buf_select1, 
+						     "select relnamespace, reltype from pg_class where oid = '%d'", rel_id);
+
+			SPI_connect();
+			ret = SPI_execute(buf_select1.data, false, 0);
+			if (ret != SPI_OK_SELECT)
+				elog(FATAL, "cannot select from pg_class for rel_id: %d  error code: %d", rel_id, ret);
+			nr = SPI_processed;
+			if (nr == 0)
+				elog(FATAL, "rel_id: %d not found in pg_class", rel_id);
+			if (nr > 1)
+				elog(FATAL, "too many rel.: %d found in pg_class for rel_id: %d" , nr, rel_id);
+
+			initStringInfo(&buf_select2);
+			appendStringInfo(&buf_select2, 
+						 " select count(*) from pg_statistic where starelid = '%d'", rel_id);
+			ret = SPI_execute(buf_select2.data, false, 0);
+			if (ret != SPI_OK_SELECT)
+				elog(FATAL, "cannot select from pg_statistic for rel_id: %d  error code: %d", rel_id, ret);
+			/* 
+			** count(*) returns only 1 row with 1 column
+			*/
+			tuptable = SPI_tuptable;
+			tupdesc = tuptable->tupdesc;
+			count_val = SPI_getvalue(tuptable->vals[0], tupdesc, 1);
+			elog(DEBUG1,"pgds: pgds_analyze: count_val: %s", count_val);
+
+			if (strcmp(count_val, "0") == 0) {
+				initStringInfo(&buf_analyze);
+				appendStringInfo(&buf_analyze, "analyze verbose %s;", rte->eref->aliasname);
+				elog(DEBUG1,"pgds: pgds_analyze: analyze: %s", rte->eref->aliasname);
+				ret = SPI_execute(buf_analyze.data, false, 0);
+				if (ret != SPI_OK_UTILITY)
+					elog(FATAL, "cannot run analyze for %s: error code %d", rte->eref->aliasname, ret);
+			}
+	
+
+			SPI_finish();
+		}
+
+/*
+		
+		
+*/
 	} 
 
 
