@@ -2,6 +2,12 @@
  *  
  * pgds.c
  * 
+ * Trying to implement dynamic statistics i.e. running ANALYZE 
+ * if statistics are missing for tables used in currently running
+ * SQL statements.
+ * 
+ * ANALYZE source code: src/backend/commands/analyze.c .
+ *
  * This program is open source, licensed under the PostgreSQL license.
  * For license terms, see the LICENSE file.
  *          
