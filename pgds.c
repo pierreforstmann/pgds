@@ -49,6 +49,7 @@
 #include "funcapi.h"
 #include "catalog/pg_type.h"
 #include "commands/dbcommands.h"
+#include "catalog/catalog.h"
 
 PG_MODULE_MAGIC;
 
@@ -60,8 +61,6 @@ typedef struct pgdsSharedState
 
 static pgdsSharedState *pgds = NULL;
 
-static int called = 0;
-
 /* Saved hook values in case of unload */
 #if PG_VERSION_NUM >= 150000
 static shmem_request_hook_type prev_shmem_request_hook = NULL;
@@ -69,6 +68,7 @@ static shmem_request_hook_type prev_shmem_request_hook = NULL;
 static post_parse_analyze_hook_type prev_post_parse_analyze_hook = NULL;
 static shmem_startup_hook_type prev_shmem_startup_hook = NULL;
 static ExecutorStart_hook_type prev_executor_start_hook = NULL;
+static ExecutorEnd_hook_type prev_executor_end_hook = NULL;
 
 /*---- Function declarations ----*/
 
@@ -85,6 +85,7 @@ static 	void 	pgds_analyze(ParseState *pstate, Query *query, JumbleState *jstate
 #endif
 
 static  void 	pgds_exec(QueryDesc *queryDesc, int eflags);
+static  void 	pgds_end(QueryDesc *queryDesc);
 
 
 /*
@@ -235,6 +236,8 @@ _PG_init(void)
 	post_parse_analyze_hook = pgds_analyze;
 	prev_executor_start_hook = ExecutorStart_hook;
  	ExecutorStart_hook = pgds_exec;	
+	prev_executor_end_hook = ExecutorEnd_hook;
+ 	ExecutorEnd_hook = pgds_end;	
 
 	elog(DEBUG5, "pgds:_PG_init():exit");
 }
@@ -249,6 +252,7 @@ _PG_fini(void)
 	shmem_startup_hook = prev_shmem_startup_hook;	
 	post_parse_analyze_hook = prev_post_parse_analyze_hook;
 	ExecutorStart_hook = prev_executor_start_hook;
+	ExecutorEnd_hook = prev_executor_end_hook;
 }
 
 
@@ -279,70 +283,64 @@ static void pgds_analyze(ParseState *pstate, Query *query, JumbleState *js)
 	/* pstate->p_sourcetext is the current query text */	
 	elog(DEBUG1,"pgds: pgds_analyze: %s",pstate->p_sourcetext);
 
-	if (called == 0)
+	foreach(cell, pstate->p_rtable)
 	{
-		called = 1;
-		
-		foreach(cell, pstate->p_rtable)
-		{
 
-            RangeTblEntry *rte = (RangeTblEntry *) lfirst(cell);
-			rel_id = rte->relid;
-			elog(DEBUG1,"pgds: pgds_analyze: rel_id: %d", rel_id);
+		RangeTblEntry *rte = (RangeTblEntry *) lfirst(cell);
+		rel_id = rte->relid;
+		elog(DEBUG1,"pgds: pgds_analyze: rel_id: %d", rel_id);
 
-			/*
-			** rel_id == 0 for some catalog queries ?
-			*/
-			if (rel_id == 0)
-				continue;
+		/*
+		 * avoid recursion
+		 */
+		if (IsCatalogRelationOid(rel_id))
+			continue;
 
-			initStringInfo(&buf_select1);
-			appendStringInfo(&buf_select1, 
-						     "select relnamespace, reltype from pg_class where oid = '%d'", rel_id);
+		/*
+		** rel_id == 0 for some catalog queries ?
+		*/
+		if (rel_id == 0)
+			continue;
 
-			SPI_connect();
-			ret = SPI_execute(buf_select1.data, false, 0);
-			if (ret != SPI_OK_SELECT)
-				elog(FATAL, "cannot select from pg_class for rel_id: %d  error code: %d", rel_id, ret);
-			nr = SPI_processed;
-			if (nr == 0)
-				elog(FATAL, "rel_id: %d not found in pg_class", rel_id);
-			if (nr > 1)
-				elog(FATAL, "too many rel.: %d found in pg_class for rel_id: %d" , nr, rel_id);
+		initStringInfo(&buf_select1);
+		appendStringInfo(&buf_select1, 
+				     "select relnamespace, reltype from pg_class where oid = '%d'", rel_id);
 
-			initStringInfo(&buf_select2);
-			appendStringInfo(&buf_select2, 
-						 " select count(*) from pg_statistic where starelid = '%d'", rel_id);
-			ret = SPI_execute(buf_select2.data, false, 0);
-			if (ret != SPI_OK_SELECT)
-				elog(FATAL, "cannot select from pg_statistic for rel_id: %d  error code: %d", rel_id, ret);
-			/* 
-			** count(*) returns only 1 row with 1 column
-			*/
-			tuptable = SPI_tuptable;
-			tupdesc = tuptable->tupdesc;
-			count_val = SPI_getvalue(tuptable->vals[0], tupdesc, 1);
-			elog(DEBUG1,"pgds: pgds_analyze: count_val: %s", count_val);
+		SPI_connect();
+		ret = SPI_execute(buf_select1.data, false, 0);
+		if (ret != SPI_OK_SELECT)
+			elog(FATAL, "cannot select from pg_class for rel_id: %d  error code: %d", rel_id, ret);
+		nr = SPI_processed;
+		if (nr == 0)
+			elog(FATAL, "rel_id: %d not found in pg_class", rel_id);
+		if (nr > 1)
+			elog(FATAL, "too many rel.: %d found in pg_class for rel_id: %d" , nr, rel_id);
 
-			if (strcmp(count_val, "0") == 0) {
-				initStringInfo(&buf_analyze);
-				appendStringInfo(&buf_analyze, "analyze verbose %s;", rte->eref->aliasname);
-				elog(DEBUG1,"pgds: pgds_analyze: analyze: %s", rte->eref->aliasname);
-				ret = SPI_execute(buf_analyze.data, false, 0);
-				if (ret != SPI_OK_UTILITY)
-					elog(FATAL, "cannot run analyze for %s: error code %d", rte->eref->aliasname, ret);
+		initStringInfo(&buf_select2);
+		appendStringInfo(&buf_select2, 
+					 " select count(*) from pg_statistic where starelid = '%d'", rel_id);
+		ret = SPI_execute(buf_select2.data, false, 0);
+		if (ret != SPI_OK_SELECT)
+			elog(FATAL, "cannot select from pg_statistic for rel_id: %d  error code: %d", rel_id, ret);
+		/* 
+		** count(*) returns only 1 row with 1 column
+		*/
+		tuptable = SPI_tuptable;
+		tupdesc = tuptable->tupdesc;
+		count_val = SPI_getvalue(tuptable->vals[0], tupdesc, 1);
+		elog(DEBUG1,"pgds: pgds_analyze: count_val: %s", count_val);
+
+		if (strcmp(count_val, "0") == 0) {
+			initStringInfo(&buf_analyze);
+			appendStringInfo(&buf_analyze, "analyze verbose %s;", rte->eref->aliasname);
+			elog(DEBUG1,"pgds: pgds_analyze: analyze: %s", rte->eref->aliasname);
+			ret = SPI_execute(buf_analyze.data, false, 0);
+			if (ret != SPI_OK_UTILITY)
+				elog(FATAL, "cannot run analyze for %s: error code %d", rte->eref->aliasname, ret);
 			}
-	
 
-			SPI_finish();
-		}
-
-/*
-		
-		
-*/
-	} 
-
+		SPI_finish();
+	}
 
 	if (prev_post_parse_analyze_hook)
 	{
@@ -366,6 +364,8 @@ static void pgds_exec(QueryDesc *queryDesc, int eflags)
 #if PG_VERSION_NUM > 100000 
 
 #endif
+
+
 	/*
  	 * must always execute here whatever PG_VERSION_NUM
  	 */
@@ -375,3 +375,15 @@ static void pgds_exec(QueryDesc *queryDesc, int eflags)
 	else	standard_ExecutorStart(queryDesc, eflags);
 }
 
+/*
+ * pgds_end
+ *
+ */
+static void pgds_end(QueryDesc *queryDesc)
+{
+
+	if (prev_executor_end_hook)
+                (*prev_executor_end_hook)(queryDesc);
+	else    standard_ExecutorEnd(queryDesc);
+
+}
