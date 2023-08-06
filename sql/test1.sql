@@ -8,8 +8,11 @@ create table t2(x int);
 select * from t1;
 select * from t1;
 --
+begin;
 insert into t2 values(2);
 select * from t2;
+select * from t2;
+commit;
 select * from t2;
 --
 select * from t1;
