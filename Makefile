@@ -6,6 +6,7 @@ EXTENSION = pgds
 DATA = pgds--0.0.1.sql
 PGFILEDESC = "pgds - DS"
 
+# run: make clean + make + make install + make installcheck
 REGRESS_OPTS =  --temp-instance=/tmp/5555 --port=5555 --temp-config pgds.conf
 REGRESS = test1 test2
 
