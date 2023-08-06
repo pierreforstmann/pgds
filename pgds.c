@@ -52,6 +52,7 @@
 #include "catalog/catalog.h"
 #include "utils/selfuncs.h"
 #include "optimizer/plancat.h"
+#include "optimizer/planner.h"
 
 PG_MODULE_MAGIC;
 
@@ -68,8 +69,7 @@ static pgdsSharedState *pgds = NULL;
 static shmem_request_hook_type prev_shmem_request_hook = NULL;
 #endif
 static shmem_startup_hook_type prev_shmem_startup_hook = NULL;
-static ExecutorStart_hook_type prev_executor_start_hook = NULL;
-static ExecutorEnd_hook_type prev_executor_end_hook = NULL;
+static planner_hook_type prev_planner_hook = NULL;
 static get_relation_stats_hook_type prev_get_relation_stats_hook= NULL;
 static get_relation_info_hook_type prev_get_relation_info_hook= NULL;
 
@@ -79,14 +79,11 @@ void		_PG_init(void);
 void		_PG_fini(void);
 
 static 	void 	pgds_shmem_startup(void);
-static 	void 	pgds_shmem_shutdown(int code, Datum arg);
-
+static 	void 	pgds_shmem_shutdown(int, Datum);
+static  PlannedStmt *pgds_planner_hook (Query *, const char *, int, ParamListInfo);
 static 	void	pgds_analyze_table(Oid);
-
-static  void 	pgds_exec(QueryDesc *queryDesc, int eflags);
-static  void 	pgds_end(QueryDesc *queryDesc);
-static 	bool	pgds_get_relation_stats(PlannerInfo *root, RangeTblEntry *, short int, VariableStatData *);
-static 	void	pgds_get_relation_info(PlannerInfo *root, Oid, bool, RelOptInfo *);
+static 	bool	pgds_get_relation_stats(PlannerInfo *, RangeTblEntry *, short int, VariableStatData *);
+static 	void	pgds_get_relation_info(PlannerInfo *, Oid, bool, RelOptInfo *);
 
 
 /*
@@ -229,22 +226,19 @@ _PG_init(void)
 	prev_shmem_request_hook = shmem_request_hook;
 	shmem_request_hook = pgds_shmem_request;
 #else
-	pgqr_shmem_request();
+7	pgqr_shmem_request();
 #endif
 	prev_shmem_startup_hook = shmem_startup_hook;
 	shmem_startup_hook = pgds_shmem_startup;
+
+	prev_planner_hook = planner_hook;
+	planner_hook = pgds_planner_hook;
 
 	prev_get_relation_stats_hook = get_relation_stats_hook;
 	get_relation_stats_hook = pgds_get_relation_stats;
 
 	prev_get_relation_info_hook = get_relation_info_hook;
 	get_relation_info_hook = pgds_get_relation_info;
-
-	prev_executor_start_hook = ExecutorStart_hook;
- 	ExecutorStart_hook = pgds_exec;	
-
-	prev_executor_end_hook = ExecutorEnd_hook;
- 	ExecutorEnd_hook = pgds_end;	
 
 	elog(DEBUG5, "pgds:_PG_init():exit");
 }
@@ -259,10 +253,36 @@ _PG_fini(void)
 	shmem_startup_hook = prev_shmem_startup_hook;	
 	get_relation_stats_hook = prev_get_relation_stats_hook;
 	get_relation_info_hook = prev_get_relation_info_hook;
-	ExecutorStart_hook = prev_executor_start_hook;
-	ExecutorEnd_hook = prev_executor_end_hook;
+
 }
 
+/*
+ *
+ * pgds_planner_hook
+ *
+ */
+
+static PlannedStmt *pgds_planner_hook (Query *parse,
+                                       const char *query_string,
+                                       int cursorOptions,
+                                       ParamListInfo boundParams)
+{
+	PlannedStmt *result;
+
+	elog(DEBUG1,"pgds: pgds_planner_hook: entry");
+
+    result = standard_planner(parse, query_string, cursorOptions, boundParams);
+
+	if (prev_planner_hook) 
+	{
+		elog(DEBUG1,"pgds: pgds_planner_hook: return");
+		return prev_planner_hook(parse, query_string, cursorOptions, boundParams);
+	}
+
+	elog(DEBUG1,"pgds: pgds_planner_hook: exit");
+    return result;
+}
+					
 /*
  *
  * pgds_analyze_table: main routine
@@ -293,6 +313,9 @@ static void pgds_analyze_table(Oid rel_id)
 		elog(FATAL, "rel_id: %d not found in pg_class", rel_id);
 	if (nr > 1)
 		elog(FATAL, "too many rel.: %d found in pg_class for rel_id: %d" , nr, rel_id);
+	/*
+	 * get only relname column for single row result
+	 */
 	tuptable = SPI_tuptable;
 	tupdesc = tuptable->tupdesc;
 	relname = SPI_getvalue(tuptable->vals[0], tupdesc, 2);
@@ -304,8 +327,8 @@ static void pgds_analyze_table(Oid rel_id)
 	if (ret != SPI_OK_SELECT)
 		elog(FATAL, "cannot select from pg_statistic for rel_id: %d  error code: %d", rel_id, ret);
 	/* 
-	** count(*) returns only 1 row with 1 column
-	*/
+	 * count(*) returns only 1 row with 1 column
+	 */
 	tuptable = SPI_tuptable;
 	tupdesc = tuptable->tupdesc;
 	count_val = SPI_getvalue(tuptable->vals[0], tupdesc, 1);
@@ -327,7 +350,16 @@ static void pgds_analyze_table(Oid rel_id)
 
 static 	bool pgds_get_relation_stats(PlannerInfo *root, RangeTblEntry *rte, short int attnum, VariableStatData *vardata)
 {
-	elog(DEBUG1,"pgds: pgds_get_relation_stats: entry");
+	elog(DEBUG1,"pgds: pgds_get_relation_stats: entry: relid = %d", rte->relid);
+
+	/*
+     * avoid call not useful
+     */
+    if (IsCatalogRelationOid(rte->relid))
+	{
+		elog(DEBUG1,"pgds: pgds_get_relation_stats: return");
+		return false;
+	}
 
 	if (prev_get_relation_stats_hook)
 		return prev_get_relation_stats_hook(root, rte, attnum, vardata);
@@ -339,11 +371,12 @@ static 	bool pgds_get_relation_stats(PlannerInfo *root, RangeTblEntry *rte, shor
 static void pgds_get_relation_info(PlannerInfo *root, Oid rel_oid, bool inhparent, RelOptInfo *rel)
 {
 
-	elog(DEBUG1,"pgds: pgds_get_relation_info: entry");
-       /*
-        * avoid infinite recursion
-        */
-       if (IsCatalogRelationOid(rel_oid))
+	elog(DEBUG1,"pgds: pgds_get_relation_info: entry: rel_oid= %d", rel_oid);
+
+    /*
+     * avoid infinite recursion
+     */
+    if (IsCatalogRelationOid(rel_oid))
 	{
 		elog(DEBUG1,"pgds: pgds_get_relation_info: return");
 		return;
@@ -358,35 +391,4 @@ static void pgds_get_relation_info(PlannerInfo *root, Oid rel_oid, bool inhparen
 	elog(DEBUG1,"pgds: pgds_get_relation_info: exit");
 }
 
-/*
- * pgds_exec
- *
- */
-static void pgds_exec(QueryDesc *queryDesc, int eflags)
-{
-#if PG_VERSION_NUM > 100000 
 
-#endif
-
-
-	/*
- 	 * must always execute here whatever PG_VERSION_NUM
- 	 */
-
-	if (prev_executor_start_hook)
-                (*prev_executor_start_hook)(queryDesc, eflags);
-	else	standard_ExecutorStart(queryDesc, eflags);
-}
-
-/*
- * pgds_end
- *
- */
-static void pgds_end(QueryDesc *queryDesc)
-{
-
-	if (prev_executor_end_hook)
-                (*prev_executor_end_hook)(queryDesc);
-	else    standard_ExecutorEnd(queryDesc);
-
-}
