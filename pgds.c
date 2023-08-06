@@ -226,7 +226,7 @@ _PG_init(void)
 	prev_shmem_request_hook = shmem_request_hook;
 	shmem_request_hook = pgds_shmem_request;
 #else
-7	pgqr_shmem_request();
+	pgqr_shmem_request();
 #endif
 	prev_shmem_startup_hook = shmem_startup_hook;
 	shmem_startup_hook = pgds_shmem_startup;
@@ -271,7 +271,7 @@ static PlannedStmt *pgds_planner_hook (Query *parse,
 
 	elog(DEBUG1,"pgds: pgds_planner_hook: entry");
 
-    result = standard_planner(parse, query_string, cursorOptions, boundParams);
+	result = standard_planner(parse, query_string, cursorOptions, boundParams);
 
 	if (prev_planner_hook) 
 	{
@@ -353,9 +353,9 @@ static 	bool pgds_get_relation_stats(PlannerInfo *root, RangeTblEntry *rte, shor
 	elog(DEBUG1,"pgds: pgds_get_relation_stats: entry: relid = %d", rte->relid);
 
 	/*
-     * avoid call not useful
-     */
-    if (IsCatalogRelationOid(rte->relid))
+	 * avoid call not useful
+	 */
+	if (IsCatalogRelationOid(rte->relid))
 	{
 		elog(DEBUG1,"pgds: pgds_get_relation_stats: return");
 		return false;
