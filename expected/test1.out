@@ -1,0 +1,45 @@
+--
+-- test1.sql
+create extension pgds;
+--
+create table t1(x int);
+create table t2(x int);
+--
+select * from t1;
+INFO:  analyzing "public.t1"
+INFO:  "t1": scanned 0 of 0 pages, containing 0 live rows and 0 dead rows; 0 rows in sample, 0 estimated total rows
+ x 
+---
+(0 rows)
+
+select * from t1;
+INFO:  analyzing "public.t1"
+INFO:  "t1": scanned 0 of 0 pages, containing 0 live rows and 0 dead rows; 0 rows in sample, 0 estimated total rows
+ x 
+---
+(0 rows)
+
+--
+insert into t2 values(2);
+select * from t2;
+INFO:  analyzing "public.t2"
+INFO:  "t2": scanned 1 of 1 pages, containing 1 live rows and 0 dead rows; 1 rows in sample, 1 estimated total rows
+ x 
+---
+ 2
+(1 row)
+
+select * from t2;
+ x 
+---
+ 2
+(1 row)
+
+--
+select * from t1;
+INFO:  analyzing "public.t1"
+INFO:  "t1": scanned 0 of 0 pages, containing 0 live rows and 0 dead rows; 0 rows in sample, 0 estimated total rows
+ x 
+---
+(0 rows)
+
