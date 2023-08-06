@@ -1,0 +1,46 @@
+--
+-- test2.sql
+--
+--
+create table t21 (x int);
+create table t22 (x int);
+create view v23 as select * from t21 union select * from t22;
+--
+select * from v23;
+INFO:  analyzing "public.t21"
+INFO:  "t21": scanned 0 of 0 pages, containing 0 live rows and 0 dead rows; 0 rows in sample, 0 estimated total rows
+INFO:  analyzing "public.t22"
+INFO:  "t22": scanned 0 of 0 pages, containing 0 live rows and 0 dead rows; 0 rows in sample, 0 estimated total rows
+ x 
+---
+(0 rows)
+
+insert into t21 values(1);
+select * from v23;
+INFO:  analyzing "public.t21"
+INFO:  "t21": scanned 1 of 1 pages, containing 1 live rows and 0 dead rows; 1 rows in sample, 1 estimated total rows
+INFO:  analyzing "public.t22"
+INFO:  "t22": scanned 0 of 0 pages, containing 0 live rows and 0 dead rows; 0 rows in sample, 0 estimated total rows
+ x 
+---
+ 1
+(1 row)
+
+insert into t22 values(2);
+select * from v23;
+INFO:  analyzing "public.t22"
+INFO:  "t22": scanned 1 of 1 pages, containing 1 live rows and 0 dead rows; 1 rows in sample, 1 estimated total rows
+ x 
+---
+ 2
+ 1
+(2 rows)
+
+--
+select * from v23;
+ x 
+---
+ 1
+ 2
+(2 rows)
+
