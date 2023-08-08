@@ -10,6 +10,7 @@ PGFILEDESC = "pgds - DS"
 REGRESS_OPTS =  --temp-instance=/tmp/5555 --port=5555 --temp-config pgds.conf
 REGRESS = test1 test2
 
+CFLAGS := $(CFLAGS) -Og
 PG_CONFIG = pg_config
 PGXS := $(shell $(PG_CONFIG) --pgxs)
 include $(PGXS)

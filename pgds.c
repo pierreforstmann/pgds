@@ -339,6 +339,7 @@ static void pgds_build_table_array(Oid rel_id)
 		return;
 
 	pgds_get_rel_details(rel_id, &relname, &relkind);
+	elog(LOG, "pgds_build_table_array: reld_id=%d relname=%s, relkind=%s", rel_id, relname, relkind);
 
 	if (strcmp(relkind, "r") == 0)
 	{
@@ -420,7 +421,7 @@ static void pgds_analyze(ParseState *pstate, Query *query, JumbleState *js)
 	elog(DEBUG1,"pgds: pgds_analyze: entry: %s",pstate->p_sourcetext);
 
 	/* pstate->p_sourcetext is the current query text */	
-	elog(DEBUG1,"pgds: pgds_analyze: %s",pstate->p_sourcetext);
+	elog(LOG,"pgds: pgds_analyze: %s",pstate->p_sourcetext);
 
 	if (pgds_avoid_recursion == 0)
 	{
@@ -444,6 +445,10 @@ static void pgds_analyze(ParseState *pstate, Query *query, JumbleState *js)
 		pgds_rel_index = 0;
 		pgds_table_index = 0;
 	}
+	else
+	{
+		elog(LOG, "pgds: pgds_analyze: return");
+	}
 
 	if (prev_post_parse_analyze_hook)
 	{
@@ -454,7 +459,7 @@ static void pgds_analyze(ParseState *pstate, Query *query, JumbleState *js)
 #endif
 	 }
 
-	elog(DEBUG1, "pgds: pgds_analyze: exit");
+	elog(LOG, "pgds: pgds_analyze: exit");
 }
 
 
