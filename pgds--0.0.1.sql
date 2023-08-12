@@ -1,4 +1,11 @@
 --
+-- pgsq-0.0.1.sql
+--
+-- Most code copyright Cybertec PostgreSQL Laurenz Albe 2019
+-- from: https://www.cybertec-postgresql.com/en/tracking-view-dependencies-in-postgresql/
+--
+-- additional code copyright Pierre Forstmann 2023
+--
 CREATE FUNCTION find_tables(p_oid oid)
 RETURNS TABLE (relid oid, relname text, relkind char)
 AS
