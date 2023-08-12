@@ -38,7 +38,7 @@ WITH RECURSIVE cte AS (
    AND d.deptype = 'n'    -- normal dependency
    AND d.refobjid <> v.oid
  )
- SELECT view,
+ SELECT refobjid,
         refobjid::regclass,
         relkind
  FROM cte

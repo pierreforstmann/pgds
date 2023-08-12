@@ -1,5 +1,5 @@
 # pgds postgresql extension
-comment = 'DS'
+comment = 'PostgreSQL dynamic statistics'
 default_version = '0.0.1'
 module_pathname = '$libdir/pgds'
 relocatable = false

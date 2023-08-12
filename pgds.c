@@ -325,6 +325,8 @@ static void pgds_build_table_array(Oid rel_id)
 {
 
 	StringInfoData buf_select;	
+	SPITupleTable *tuptable;
+    TupleDesc tupdesc;
 	int j;
 	int nr;
 	int ret;
@@ -354,47 +356,34 @@ static void pgds_build_table_array(Oid rel_id)
 		 */	
 		initStringInfo(&buf_select);
 		appendStringInfo(&buf_select, 
-					    "SELECT v.oid::regclass AS view,"
-						"d.refobjid, "
-						"d.refobjid::regclass, "
-       					"c.relkind "
-						"FROM pg_depend AS d "
-   						"JOIN pg_rewrite AS r "
-      					"ON r.oid = d.objid "
-   						"JOIN pg_class AS v "
-      					"ON v.oid = r.ev_class "
-   						"JOIN pg_class as c "
-      					"ON d.refobjid = c.oid "
-						"WHERE v.relkind = 'v' "
-  						"AND d.classid = 'pg_rewrite'::regclass "
-  						"AND d.refclassid = 'pg_class'::regclass "
-  						"AND d.deptype = 'n' "
-  						"AND v.oid = %d "
-						"AND d.refobjid <> v.oid;", rel_id);
+					    "SELECT * from find_tables(%d)", rel_id);
 		ret = SPI_execute(buf_select.data, false, 0);
 		if (ret != SPI_OK_SELECT)
 			elog(FATAL, "cannot get dependant relations for rel_id %d: error code: %d", rel_id, ret);
 		nr = SPI_processed;		
+		elog(LOG, "pgds_build_table_array: nr=%d", nr);
 		/*
 		 * column 2 is referenced rel_id
 		 * column 3 is referenced rel_name
 		 * column 4 is referenced rel_kind
 		*/
+	 	tuptable = SPI_tuptable;
+    	tupdesc = tuptable->tupdesc;
 		for (j = 0; j < nr; j++)
 		{
-			ref_rel_id = DatumGetInt32(SPI_getbinval(SPI_tuptable->vals[j],
-							  SPI_tuptable->tupdesc, 2, &isnull));
-			ref_rel_name = SPI_getvalue(SPI_tuptable->vals[j],
-							  SPI_tuptable->tupdesc, 3);
-			ref_rel_kind = SPI_getvalue(SPI_tuptable->vals[j],
-							  SPI_tuptable->tupdesc, 4);
+			elog(LOG, "pgds_build_table_array: j=%d", j);
+			ref_rel_id = DatumGetInt32(SPI_getbinval(tuptable->vals[j],
+							  tupdesc, 1, &isnull));
+			ref_rel_name = SPI_getvalue(tuptable->vals[j],
+							  tupdesc, 2);
+			ref_rel_kind = SPI_getvalue(tuptable->vals[j],
+							  tupdesc, 3);
 			if (strcmp(ref_rel_kind,"r") == 0 && ref_rel_id != 0)
 			{
 					pgds_tableoid_array[pgds_table_index] = ref_rel_id;
 					pgds_tablename_array[pgds_table_index] = ref_rel_name;
 					pgds_table_index++;
 			}
-			else	pgds_build_table_array(ref_rel_id);
 		}
 	}
 	else
