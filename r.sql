@@ -1,3 +1,11 @@
+--
+-- r.sql
+--
+-- Most code copyright Cybertec PostgreSQL Laurenz Albe 2019
+-- from: https://www.cybertec-postgresql.com/en/tracking-view-dependencies-in-postgresql/
+--
+-- additional code copyright Pierre Forstmann 2023
+--
 WITH RECURSIVE cte AS (
   SELECT v.oid::regclass AS view,
        d.refobjid,
