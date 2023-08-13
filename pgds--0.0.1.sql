@@ -7,14 +7,15 @@
 -- additional code copyright Pierre Forstmann 2023
 --
 CREATE FUNCTION find_tables(p_oid oid)
-RETURNS TABLE (relid oid, relname text, relkind char)
+RETURNS TABLE (relid oid, relname text, relkind char, relowner oid)
 AS
 $$
 WITH RECURSIVE cte AS (
   SELECT v.oid::regclass AS view,
        d.refobjid,
        d.refobjid::regclass AS relname,
-       c.relkind
+       c.relkind,
+       c.relowner
   FROM pg_depend AS d      -- objects that depend on the table
    JOIN pg_rewrite AS r  -- rules depending on the table
       ON r.oid = d.objid
@@ -33,7 +34,8 @@ WITH RECURSIVE cte AS (
   SELECT v.oid::regclass AS view,
        d.refobjid,
        d.refobjid::regclass AS relname,
-       c.relkind
+       c.relkind,
+       c.relowner
   FROM pg_depend AS d      -- objects that depend on the table
    JOIN pg_rewrite AS r  -- rules depending on the table
       ON r.oid = d.objid
@@ -51,9 +53,10 @@ WITH RECURSIVE cte AS (
    AND d.refobjid <> v.oid
  )
  SELECT
-        refobjid,
+   refobjid,
 	refobjid::regclass,
-        relkind
+   relkind,
+   relowner
  FROM cte
  WHERE relkind ='r';
  $$

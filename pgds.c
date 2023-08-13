@@ -73,6 +73,7 @@ static	int	pgds_rel_index = 0;
 #define MAX_TABLE	10*MAX_REL
 static 	Oid pgds_tableoid_array[MAX_TABLE] = {};
 static 	char *pgds_tablename_array[MAX_TABLE] = {};
+static 	Oid pgds_tableowner_array[MAX_TABLE] = {};
 static	int pgds_table_index = 0;
 
 /* Saved hook values in case of unload */
@@ -291,17 +292,18 @@ static void pgds_build_rel_array(ParseState *pstate)
 /*
  *   pgds_get_rel_details
  */
-static void pgds_get_rel_details(Oid rel_id, char **relname, char** relkind)
+static void pgds_get_rel_details(Oid rel_id, char **relname, char** relkind, Oid *relowner)
 {
 	StringInfoData buf_select;	
 	SPITupleTable *tuptable;
 	TupleDesc tupdesc;
 	int ret;
 	int nr;
+	bool isnull;
 
 	initStringInfo(&buf_select);
 	appendStringInfo(&buf_select, 
-				     "select relnamespace, relname, relkind from pg_class where oid = '%d'", rel_id);
+				     "select relnamespace, relname, relkind, relowner from pg_class where oid = '%d'", rel_id);
 	ret = SPI_execute(buf_select.data, false, 0);
 	if (ret != SPI_OK_SELECT)
 		elog(FATAL, "cannot select from pg_class for rel_id: %d  error code: %d", rel_id, ret);
@@ -313,11 +315,13 @@ static void pgds_get_rel_details(Oid rel_id, char **relname, char** relkind)
 	/*
 	 * relname = column 2 for single row result
 	 * relkind = column 3 for single row result
+	 * relowner = column 4 for single row result
 	*/
 	tuptable = SPI_tuptable;
 	tupdesc = tuptable->tupdesc;
 	*relname = SPI_getvalue(tuptable->vals[0], tupdesc, 2);
 	*relkind = SPI_getvalue(tuptable->vals[0], tupdesc, 3);
+	*relowner = DatumGetInt32(SPI_getbinval(tuptable->vals[0], tupdesc, 4, &isnull));
 
 }
 
@@ -335,16 +339,18 @@ static void pgds_build_table_array(Oid rel_id)
 	int ret;
 	char *relname;
 	char *relkind;
+	Oid relowner;
 	int	ref_rel_id;
 	char *ref_rel_kind;
 	char *ref_rel_name;
+	Oid ref_rel_owner;
 	bool isnull;
 
 	if (rel_id == 0)
 		return;
 
-	pgds_get_rel_details(rel_id, &relname, &relkind);
-	elog(LOG, "pgds_build_table_array: reld_id=%d relname=%s, relkind=%s", rel_id, relname, relkind);
+	pgds_get_rel_details(rel_id, &relname, &relkind, &relowner);
+	elog(LOG, "pgds_build_table_array: reld_id=%d relname=%s, relkind=%s relwoner=%d", rel_id, relname, relkind, relowner);
 
 	if (strcmp(relkind, "r") == 0)
 	{
@@ -352,6 +358,7 @@ static void pgds_build_table_array(Oid rel_id)
 			{
 				pgds_tableoid_array[pgds_table_index] = rel_id;
 				pgds_tablename_array[pgds_table_index] = relname;
+				pgds_tableowner_array[pgds_table_index] = relowner;
 				pgds_table_index++;
 			} 
 			else elog(ERROR, "pgds_build_table_array: too many tables(%d)", MAX_TABLE);
@@ -370,9 +377,10 @@ static void pgds_build_table_array(Oid rel_id)
 		nr = SPI_processed;		
 		elog(LOG, "pgds_build_table_array: nr=%d", nr);
 		/*
-		 * column 2 is referenced rel_id
-		 * column 3 is referenced rel_name
-		 * column 4 is referenced rel_kind
+		 * column 1 is referenced rel_id
+		 * column 2 is referenced rel_name
+		 * column 3 is referenced rel_kind
+		 * column 4 is referenced rel_owner
 		*/
 	 	tuptable = SPI_tuptable;
     	tupdesc = tuptable->tupdesc;
@@ -385,12 +393,15 @@ static void pgds_build_table_array(Oid rel_id)
 							  tupdesc, 2);
 			ref_rel_kind = SPI_getvalue(tuptable->vals[j],
 							  tupdesc, 3);
+			ref_rel_owner = DatumGetInt32(SPI_getbinval(tuptable->vals[j],
+							  tupdesc, 4, &isnull));
 			if (strcmp(ref_rel_kind,"r") == 0 && ref_rel_id != 0)
 			{
 					if (pgds_table_index < MAX_TABLE)
 					{
 						pgds_tableoid_array[pgds_table_index] = ref_rel_id;
 						pgds_tablename_array[pgds_table_index] = ref_rel_name;
+						pgds_tableowner_array[pgds_table_index] = ref_rel_owner;
 						pgds_table_index++;
 					} else elog(ERROR, "pgds_build_table_array: too many tables(%d)", MAX_TABLE);
 			}
@@ -464,8 +475,8 @@ static void pgds_analyze(ParseState *pstate, Query *query, JumbleState *js)
 
 /*
  *
- * pgds_analyze_table: main routine
- *
+ * pgds_analyze_table
+ * 
  */
 static void pgds_analyze_table(int index)
 {
