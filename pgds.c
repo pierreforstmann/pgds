@@ -2,11 +2,11 @@
  *  
  * pgds.c
  * 
- * Trying to implement dynamic statistics i.e. running ANALYZE 
+ * dynamic statistics implementation i.e. running ANALYZE 
  * if statistics are missing for tables used in currently running
- * SQL statements.
+ * SQL statement.
  * 
- * ANALYZE source code: src/backend/commands/analyze.c .
+ * NB: ANALYZE command source code: src/backend/commands/analyze.c
  *
  * This program is open source, licensed under the PostgreSQL license.
  * For license terms, see the LICENSE file.
@@ -66,13 +66,13 @@ typedef struct pgdsSharedState
 
 static pgdsSharedState *pgds = NULL;
 
-#define	MAX_RELS		1024
-static 	Oid pgds_rel_array[MAX_RELS] = {};
+#define	MAX_REL	1024
+static 	Oid pgds_rel_array[MAX_REL] = {};
 static	int	pgds_rel_index = 0;
 
-#define MAX_TABLES		1024
-static 	Oid pgds_tableoid_array[MAX_TABLES] = {};
-static 	char *pgds_tablename_array[MAX_TABLES] = {};
+#define MAX_TABLE	10*MAX_REL
+static 	Oid pgds_tableoid_array[MAX_TABLE] = {};
+static 	char *pgds_tablename_array[MAX_TABLE] = {};
 static	int pgds_table_index = 0;
 
 /* Saved hook values in case of unload */
@@ -278,9 +278,12 @@ static void pgds_build_rel_array(ParseState *pstate)
 	{
 		RangeTblEntry *rte = (RangeTblEntry *) lfirst(cell);
 		rel_id = rte->relid;
-		
-		pgds_rel_array[pgds_rel_index] = rel_id;
-		pgds_rel_index++;
+		if (pgds_rel_index < MAX_REL )
+		{
+			pgds_rel_array[pgds_rel_index] = rel_id;
+			pgds_rel_index++;
+		} 
+		else elog(ERROR, "pgds_build_rel_array: too many relations (%d)", MAX_REL);
 	}
 }
 
@@ -345,9 +348,13 @@ static void pgds_build_table_array(Oid rel_id)
 
 	if (strcmp(relkind, "r") == 0)
 	{
-			pgds_tableoid_array[pgds_table_index] = rel_id;
-			pgds_tablename_array[pgds_table_index] = relname;
-			pgds_table_index++;
+			if (pgds_table_index < MAX_TABLE)
+			{
+				pgds_tableoid_array[pgds_table_index] = rel_id;
+				pgds_tablename_array[pgds_table_index] = relname;
+				pgds_table_index++;
+			} 
+			else elog(ERROR, "pgds_build_table_array: too many tables(%d)", MAX_TABLE);
 	} 
 	else if (strcmp(relkind, "v") == 0)
 	{
@@ -380,9 +387,12 @@ static void pgds_build_table_array(Oid rel_id)
 							  tupdesc, 3);
 			if (strcmp(ref_rel_kind,"r") == 0 && ref_rel_id != 0)
 			{
-					pgds_tableoid_array[pgds_table_index] = ref_rel_id;
-					pgds_tablename_array[pgds_table_index] = ref_rel_name;
-					pgds_table_index++;
+					if (pgds_table_index < MAX_TABLE)
+					{
+						pgds_tableoid_array[pgds_table_index] = ref_rel_id;
+						pgds_tablename_array[pgds_table_index] = ref_rel_name;
+						pgds_table_index++;
+					} else elog(ERROR, "pgds_build_table_array: too many tables(%d)", MAX_TABLE);
 			}
 		}
 	}
