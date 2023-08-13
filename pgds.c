@@ -488,6 +488,12 @@ static void pgds_analyze_table(int index)
     char *count_val;
 	int ret;
 
+	if (!superuser() && GetUserId() != pgds_tableowner_array[index])
+	{
+		elog (INFO, "pgds_analyze_table: current user cannot analyze %s", pgds_tablename_array[index]);
+		return;
+	}
+
     initStringInfo(&buf_select);
     appendStringInfo(&buf_select,
                      " select count(*) from pg_statistic where starelid = '%d'", pgds_tableoid_array[index]);
