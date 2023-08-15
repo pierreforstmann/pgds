@@ -100,7 +100,7 @@ static  void    pgds_analyze(ParseState *pstate, Query *query, JumbleState *jsta
 #endif
 
 static 	void	pgds_analyze_table(int);
-static	void	pgds_build_rel_array(ParseState *);
+static	void	pgds_build_rel_array(Query *);
 static	void	pgds_build_table_array();
 
 
@@ -270,12 +270,12 @@ _PG_fini(void)
 /*
  * build_rel_array
  */
-static void pgds_build_rel_array(ParseState *pstate)
+static void pgds_build_rel_array(Query *query)
 {
 	ListCell *cell;
 	Oid rel_id;
 
-	foreach(cell, pstate->p_rtable)
+	foreach(cell, query->rtable)
 	{
 		RangeTblEntry *rte = (RangeTblEntry *) lfirst(cell);
 		rel_id = rte->relid;
@@ -443,7 +443,7 @@ static void pgds_analyze(ParseState *pstate, Query *query, JumbleState *js)
 	 	 *  2. for all tables: check and gather statistics
 	 	 */
 
-		pgds_build_rel_array(pstate);
+		pgds_build_rel_array(query);
 		for (i = 0; i < pgds_rel_index; i++)
 			pgds_build_table_array(pgds_rel_array[i]);
 		for (i = 0 ; i < pgds_table_index; i++)
