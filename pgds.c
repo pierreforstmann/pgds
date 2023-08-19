@@ -272,7 +272,7 @@ static bool pgds_tree_walker(Query *node, void *context)
 {
 
 	/*
-	 *  Note to selt: full liste of node tags are only in *compiled* src/include/nodes/nodes.h
+	 *  Note to self: full liste of node tags are only in *compiled* src/include/nodes/nodes.h
 	 */
 
 	/*
@@ -296,26 +296,22 @@ static bool pgds_tree_walker(Query *node, void *context)
              if (rte->rtekind == RTE_RELATION ||
                  (rte->rtekind == RTE_SUBQUERY && OidIsValid(rte->relid)) ||
                  (rte->rtekind == RTE_NAMEDTUPLESTORE && OidIsValid(rte->relid)))
-					/*
-					 * elog(INFO, "pgds_tree_walker: relid=%d", rte->relid);
-					 */
+					
+					 elog(INFO, "pgds_tree_walker: relid=%d", rte->relid);
+					
                  	/* context->glob->relationOids =
                      lappend_oid(context->glob->relationOids, rte->relid);
 					*/
+		 }
 
-			/*
-			 * from rewriteHandler.c
-			 * AcquireRewriteLocks
-			 */
-			if (rte->rtekind == RTE_SUBQUERY)
-				return query_tree_walker(rte->subquery, pgds_tree_walker, (void *) context, QTW_EXAMINE_RTES_BEFORE);
-	
-         }
-  
-         /* And recurse  ...*/
-         query_tree_walker(query, pgds_tree_walker, (void *) context, QTW_EXAMINE_RTES_BEFORE);
-	}
+		 /* And recurse into the query's subexpressions */
+		 return query_tree_walker(query, pgds_tree_walker, (void *) context, 0);
+    }  
+	 /* Extract function dependencies and check for regclass Consts */
+     // fix_expr_common(context, node);
+     return expression_tree_walker((Node *)node, pgds_tree_walker, (void *) context);
 }
+
 
 /*
  * build_rel_array
@@ -339,7 +335,7 @@ static void pgds_build_rel_array(Query *query)
 		else elog(ERROR, "pgds_build_rel_array: too many relations (%d)", MAX_REL);
 	}
 
-	result = query_tree_walker(query, pgds_tree_walker, context, QTW_EXAMINE_RTES_BEFORE);
+	result = query_tree_walker(query, pgds_tree_walker, context, 0);
 }
 
 
