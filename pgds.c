@@ -272,6 +272,10 @@ static bool pgds_tree_walker(Query *node, void *context)
 {
 
 	/*
+	 *  Note to selt: full liste of node tags are only in *compiled* src/include/nodes/nodes.h
+	 */
+
+	/*
 	 * from setrefs.c
 	 * extract_query_dependencies_walker
 	 */ 
