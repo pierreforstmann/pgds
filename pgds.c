@@ -53,6 +53,7 @@
 #include "utils/selfuncs.h"
 #include "optimizer/plancat.h"
 #include "optimizer/planner.h"
+#include "nodes/nodeFuncs.h"
 
 PG_MODULE_MAGIC;
 
@@ -102,7 +103,7 @@ static  void    pgds_analyze(ParseState *pstate, Query *query, JumbleState *jsta
 static 	void	pgds_analyze_table(int);
 static	void	pgds_build_rel_array(Query *);
 static	void	pgds_build_table_array();
-
+static  bool   pgds_tree_walker(Query *node, void *context);
 
 /*
  *  Estimate shared memory space needed.
@@ -267,6 +268,51 @@ _PG_fini(void)
 
 }
 
+static bool pgds_tree_walker(Query *node, void *context)
+{
+
+	/*
+	 * from setrefs.c
+	 * extract_query_dependencies_walker
+	 */ 
+
+	if (node == NULL)
+         return false;
+
+ 	if (IsA(node, Query))
+    {
+         Query      *query = (Query *) node;
+         ListCell   *lc;
+  
+         /* Collect relation OIDs in this Query's rtable */
+         foreach(lc, query->rtable)
+         {
+             RangeTblEntry *rte = (RangeTblEntry *) lfirst(lc);
+  
+             if (rte->rtekind == RTE_RELATION ||
+                 (rte->rtekind == RTE_SUBQUERY && OidIsValid(rte->relid)) ||
+                 (rte->rtekind == RTE_NAMEDTUPLESTORE && OidIsValid(rte->relid)))
+					/*
+					 * elog(INFO, "pgds_tree_walker: relid=%d", rte->relid);
+					 */
+                 	/* context->glob->relationOids =
+                     lappend_oid(context->glob->relationOids, rte->relid);
+					*/
+
+			/*
+			 * from rewriteHandler.c
+			 * AcquireRewriteLocks
+			 */
+			if (rte->rtekind == RTE_SUBQUERY)
+				return query_tree_walker(rte->subquery, pgds_tree_walker, (void *) context, QTW_EXAMINE_RTES_BEFORE);
+	
+         }
+  
+         /* And recurse  ...*/
+         query_tree_walker(query, pgds_tree_walker, (void *) context, QTW_EXAMINE_RTES_BEFORE);
+	}
+}
+
 /*
  * build_rel_array
  */
@@ -274,18 +320,22 @@ static void pgds_build_rel_array(Query *query)
 {
 	ListCell *cell;
 	Oid rel_id;
+	void * context = NULL;
+	bool result;
 
 	foreach(cell, query->rtable)
 	{
 		RangeTblEntry *rte = (RangeTblEntry *) lfirst(cell);
 		rel_id = rte->relid;
-		if (pgds_rel_index < MAX_REL )
+				if (pgds_rel_index < MAX_REL )
 		{
 			pgds_rel_array[pgds_rel_index] = rel_id;
 			pgds_rel_index++;
 		} 
 		else elog(ERROR, "pgds_build_rel_array: too many relations (%d)", MAX_REL);
 	}
+
+	result = query_tree_walker(query, pgds_tree_walker, context, QTW_EXAMINE_RTES_BEFORE);
 }
 
 
