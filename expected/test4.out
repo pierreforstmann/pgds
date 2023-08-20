@@ -1,0 +1,15 @@
+--
+-- test1.sql
+--
+create table t41(x1 int);
+create table t42(x2 int);
+--
+select * from t41 where x1 = (select max(x2) from t42);
+INFO:  analyzing "public.t41"
+INFO:  "t41": scanned 0 of 0 pages, containing 0 live rows and 0 dead rows; 0 rows in sample, 0 estimated total rows
+INFO:  analyzing "public.t42"
+INFO:  "t42": scanned 0 of 0 pages, containing 0 live rows and 0 dead rows; 0 rows in sample, 0 estimated total rows
+ x1 
+----
+(0 rows)
+

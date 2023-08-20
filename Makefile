@@ -8,7 +8,7 @@ PGFILEDESC = "pgds - DS"
 
 # run: make clean + make + make install + make installcheck
 REGRESS_OPTS =  --temp-instance=/tmp/5555 --port=5555 --temp-config pgds.conf
-REGRESS = test1 test2 test3
+REGRESS = test1 test2 test3 test4
 
 CFLAGS := $(CFLAGS) -Og
 PG_CONFIG = pg_config

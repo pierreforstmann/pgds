@@ -9,13 +9,37 @@ create table t15(x int);
 create table t16(x int);
 --
 create view v31 as select * from t11 union select * from t12;
+INFO:  analyzing "public.t11"
+INFO:  "t11": scanned 0 of 0 pages, containing 0 live rows and 0 dead rows; 0 rows in sample, 0 estimated total rows
+INFO:  analyzing "public.t12"
+INFO:  "t12": scanned 0 of 0 pages, containing 0 live rows and 0 dead rows; 0 rows in sample, 0 estimated total rows
 create view v32 as select * from t13 union select * from t14;
+INFO:  analyzing "public.t13"
+INFO:  "t13": scanned 0 of 0 pages, containing 0 live rows and 0 dead rows; 0 rows in sample, 0 estimated total rows
+INFO:  analyzing "public.t14"
+INFO:  "t14": scanned 0 of 0 pages, containing 0 live rows and 0 dead rows; 0 rows in sample, 0 estimated total rows
 create view v33 as select * from t15 union select * from t16;
+INFO:  analyzing "public.t15"
+INFO:  "t15": scanned 0 of 0 pages, containing 0 live rows and 0 dead rows; 0 rows in sample, 0 estimated total rows
+INFO:  analyzing "public.t16"
+INFO:  "t16": scanned 0 of 0 pages, containing 0 live rows and 0 dead rows; 0 rows in sample, 0 estimated total rows
 --
 create view v42 as 
  select * from v31 union
  select * from v32 union
  select * from v33;
+INFO:  analyzing "public.t12"
+INFO:  "t12": scanned 0 of 0 pages, containing 0 live rows and 0 dead rows; 0 rows in sample, 0 estimated total rows
+INFO:  analyzing "public.t11"
+INFO:  "t11": scanned 0 of 0 pages, containing 0 live rows and 0 dead rows; 0 rows in sample, 0 estimated total rows
+INFO:  analyzing "public.t14"
+INFO:  "t14": scanned 0 of 0 pages, containing 0 live rows and 0 dead rows; 0 rows in sample, 0 estimated total rows
+INFO:  analyzing "public.t13"
+INFO:  "t13": scanned 0 of 0 pages, containing 0 live rows and 0 dead rows; 0 rows in sample, 0 estimated total rows
+INFO:  analyzing "public.t16"
+INFO:  "t16": scanned 0 of 0 pages, containing 0 live rows and 0 dead rows; 0 rows in sample, 0 estimated total rows
+INFO:  analyzing "public.t15"
+INFO:  "t15": scanned 0 of 0 pages, containing 0 live rows and 0 dead rows; 0 rows in sample, 0 estimated total rows
 --
 insert into t1 values(1);
 INFO:  analyzing "public.t1"
