@@ -103,7 +103,9 @@ static  void    pgds_analyze(ParseState *pstate, Query *query, JumbleState *jsta
 static 	void	pgds_analyze_table(int);
 static	void	pgds_build_rel_array(Query *);
 static	void	pgds_build_table_array();
-static  bool   pgds_tree_walker(Query *node, void *context);
+static  bool    pgds_tree_walker(Query *node, void *context);
+static  bool    pgds_sublink_walker(Node *node, void *context);
+static  void 	pgds_add_rel_array(Oid relid);
 
 /*
  *  Estimate shared memory space needed.
@@ -265,19 +267,48 @@ _PG_fini(void)
 {
 	shmem_startup_hook = prev_shmem_startup_hook;	
 	post_parse_analyze_hook = prev_post_parse_analyze_hook;
+}
 
+static void pgds_add_rel_array(Oid relid)
+{
+	bool found = false;
+	int i;
+
+	/*
+	 * tree walkers may find same relation several times
+	 */
+	for (i = 0 ; i < pgds_rel_index; i++)
+	{
+		if (pgds_rel_array[i] == relid) 
+		{
+			found = true;
+			break;
+		}
+	}
+	if (found == true)
+		return;
+
+	if (pgds_rel_index < MAX_REL )
+	{
+		pgds_rel_array[pgds_rel_index] = relid;
+		pgds_rel_index++;
+	} 
+	else elog(ERROR, "pgds_add_rel_array: too many relations (%d)", MAX_REL);
 }
 
 static bool pgds_tree_walker(Query *node, void *context)
 {
-
 	/*
-	 *  Note to self: full liste of node tags are only in *compiled* src/include/nodes/nodes.h
+	 *  Note to self: full list of node tags are only in *compiled* src/include/nodes/nodes.h
 	 */
 
+	 ListCell   *l;
+
+	// elog(INFO, "pgds_tree_walker: input= %s", nodeToString(node));
+
 	/*
-	 * from setrefs.c
-	 * extract_query_dependencies_walker
+	 * from rewriteHandler.c
+	 * AcquireRewriteLocks
 	 */ 
 
 	if (node == NULL)
@@ -285,57 +316,80 @@ static bool pgds_tree_walker(Query *node, void *context)
 
  	if (IsA(node, Query))
     {
-         Query      *query = (Query *) node;
+
          ListCell   *lc;
   
-         /* Collect relation OIDs in this Query's rtable */
-         foreach(lc, query->rtable)
+         foreach(lc, node->rtable)
          {
              RangeTblEntry *rte = (RangeTblEntry *) lfirst(lc);
   
-             if (rte->rtekind == RTE_RELATION ||
-                 (rte->rtekind == RTE_SUBQUERY && OidIsValid(rte->relid)) ||
-                 (rte->rtekind == RTE_NAMEDTUPLESTORE && OidIsValid(rte->relid)))
-					
-					 elog(INFO, "pgds_tree_walker: relid=%d", rte->relid);
-					
-                 	/* context->glob->relationOids =
-                     lappend_oid(context->glob->relationOids, rte->relid);
-					*/
+             if (rte->rtekind == RTE_RELATION)
+			 {
+					// elog(INFO, "pgds_tree_walker: relid=%d", rte->relid);
+					pgds_add_rel_array(rte->relid);
+			 }
+
+			if (rte->rtekind == RTE_SUBQUERY)
+				(void)pgds_tree_walker(rte->subquery, context);
 		 }
 
-		 /* And recurse into the query's subexpressions */
-		 return query_tree_walker(query, pgds_tree_walker, (void *) context, 0);
-    }  
-	 /* Extract function dependencies and check for regclass Consts */
-     // fix_expr_common(context, node);
-     return expression_tree_walker((Node *)node, pgds_tree_walker, (void *) context);
+		/* Recurse into subqueries in WITH */
+    	foreach(l, node->cteList)
+    	{	
+       		 CommonTableExpr *cte = (CommonTableExpr *) lfirst(l);
+  
+       		pgds_tree_walker((Query *) cte->ctequery, context);
+    	}
+	
+	}
+
+	/*
+     * Recurse into sublink subqueries, too.  But we already did the ones in
+     * the rtable and cteList.
+     */
+    if (node->hasSubLinks)
+       	query_tree_walker(node, pgds_sublink_walker, &context,
+    		       	               QTW_IGNORE_RC_SUBQUERIES);
+		// pgds_sublink_walker((Node *)node, context);
+
 }
 
+static bool pgds_sublink_walker(Node *node, void *context)
+{
+
+	//elog(INFO, "pgds_sublink_walker: input=%s", nodeToString(node));
+	/*
+	 * from rewriteHandler.c
+	 * acquireLocksOnSubLinks
+	 */
+	if (node == NULL)
+         return false;
+     if (IsA(node, SubLink))
+     {
+         SubLink    *sub = (SubLink *) node;
+  
+         /* Do what we came for */
+         pgds_tree_walker((Query *) sub->subselect,
+                             context);
+         /* Fall through to process lefthand args of SubLink */
+     }
+  
+     /*
+      * Do NOT recurse into Query nodes, because (AcquireRewriteLocks)pgds_tree_walker already
+      * processed subselects of subselects for us.
+      */
+     return expression_tree_walker(node, pgds_sublink_walker, context);
+
+}
 
 /*
  * build_rel_array
  */
 static void pgds_build_rel_array(Query *query)
 {
-	ListCell *cell;
-	Oid rel_id;
-	void * context = NULL;
-	bool result;
+	void *context = NULL;
 
-	foreach(cell, query->rtable)
-	{
-		RangeTblEntry *rte = (RangeTblEntry *) lfirst(cell);
-		rel_id = rte->relid;
-				if (pgds_rel_index < MAX_REL )
-		{
-			pgds_rel_array[pgds_rel_index] = rel_id;
-			pgds_rel_index++;
-		} 
-		else elog(ERROR, "pgds_build_rel_array: too many relations (%d)", MAX_REL);
-	}
-
-	result = query_tree_walker(query, pgds_tree_walker, context, 0);
+	(void)pgds_tree_walker(query, context);
 }
 
 
