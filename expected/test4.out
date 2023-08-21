@@ -14,13 +14,32 @@ INFO:  "t42": scanned 0 of 0 pages, containing 0 live rows and 0 dead rows; 0 ro
 (0 rows)
 
 --
+--
 create table t43(x3 int);
 create table t44(x4 int);
+--
 with v as (select x3 from t43) select count(*) from v where x3 = 123;
 INFO:  analyzing "public.t43"
 INFO:  "t43": scanned 0 of 0 pages, containing 0 live rows and 0 dead rows; 0 rows in sample, 0 estimated total rows
  count 
 -------
      0
+(1 row)
+
+--
+--
+select 
+ (select min(x3) from t43) as c1, 
+ (select max(x4) from t44) as c2, 
+ avg(x1) as c3 from t41;
+INFO:  analyzing "public.t41"
+INFO:  "t41": scanned 0 of 0 pages, containing 0 live rows and 0 dead rows; 0 rows in sample, 0 estimated total rows
+INFO:  analyzing "public.t43"
+INFO:  "t43": scanned 0 of 0 pages, containing 0 live rows and 0 dead rows; 0 rows in sample, 0 estimated total rows
+INFO:  analyzing "public.t44"
+INFO:  "t44": scanned 0 of 0 pages, containing 0 live rows and 0 dead rows; 0 rows in sample, 0 estimated total rows
+ c1 | c2 | c3 
+----+----+----
+    |    |   
 (1 row)
 
