@@ -456,7 +456,7 @@ static void pgds_build_table_array(Oid rel_id)
 	pgds_get_rel_details(rel_id, &relname, &relkind, &relowner);
 	elog(LOG, "pgds_build_table_array: reld_id=%d relname=%s, relkind=%s relwoner=%d", rel_id, relname, relkind, relowner);
 
-	if (strcmp(relkind, "r") == 0)
+	if (strcmp(relkind, "r") == 0 || strcmp(relkind, "p") == 0)
 	{
 			if (pgds_table_index < MAX_TABLE)
 			{

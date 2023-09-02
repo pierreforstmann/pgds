@@ -1,5 +1,5 @@
 --
--- test5.sql
+-- test4.sql
 --
 create table t41(x1 int);
 create table t42(x2 int);
