@@ -4,7 +4,7 @@ PostgreSQL extension to gather dynamic statistics
 
 ## Compiling
 
-This module can be built using the standard PGXS infrastructure. For this to work, the pg_config program must be available in your $PATH:
+This module can be built using the standard PGXS infrastructure: for this to work, the `pg_config` program must be available in your $PATH:
 
 `git clone https://github.com/pierreforstmann/pgds.git`
 <br>
@@ -23,6 +23,7 @@ At server level with shared_preload_libraries parameter:
 <br>
 `shared_preload_libraries = 'pgds'`
 <br>
+
 And following SQL statement should be run:
 <br>
 `create extension pgds;`
@@ -30,7 +31,7 @@ And following SQL statement should be run:
 
 pgds has been successfully tested with PostgreSQL 12, 13, 14, 15 and 16.
 
-# Usage
+## Usage
 
 pgds has no GUC parameter.
 
