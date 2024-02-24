@@ -6,6 +6,17 @@
 --
 -- additional code copyright Pierre Forstmann 2023
 --
+-- NB: To avoid following errors with PG 12.8:
+--
+-- ERROR:  return type mismatch in function declared to return record
+-- DETAIL:  Final statement returns regclass instead of text at column 2.
+-- CONTEXT:  SQL function "find_tables" during startup
+-- SQL statement "SELECT * from find_tables(16397)"
+-- 
+-- added conversions to text and char in top level SELECT for column 2 and colum 3:
+-- refobjid::regclass::text,
+-- relkind::char,
+--
 CREATE FUNCTION find_tables(p_oid oid)
 RETURNS TABLE (relid oid, relname text, relkind char, relowner oid)
 AS
@@ -13,7 +24,7 @@ $$
 WITH RECURSIVE cte AS (
   SELECT v.oid::regclass AS view,
        d.refobjid,
-       d.refobjid::regclass AS relname,
+       d.refobjid::regclass::text AS relname,
        c.relkind,
        c.relowner
   FROM pg_depend AS d      -- objects that depend on the table
@@ -33,7 +44,7 @@ WITH RECURSIVE cte AS (
  UNION
   SELECT v.oid::regclass AS view,
        d.refobjid,
-       d.refobjid::regclass AS relname,
+       d.refobjid::regclass::text AS relname,
        c.relkind,
        c.relowner
   FROM pg_depend AS d      -- objects that depend on the table
@@ -54,8 +65,8 @@ WITH RECURSIVE cte AS (
  )
  SELECT
    refobjid,
-	refobjid::regclass,
-   relkind,
+   refobjid::regclass::text,
+   relkind::char,
    relowner
  FROM cte
  WHERE relkind ='r';

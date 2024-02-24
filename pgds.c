@@ -247,7 +247,7 @@ _PG_init(void)
 	prev_shmem_request_hook = shmem_request_hook;
 	shmem_request_hook = pgds_shmem_request;
 #else
-	pgqr_shmem_request();
+	pgds_shmem_request();
 #endif
 	prev_shmem_startup_hook = shmem_startup_hook;
 	shmem_startup_hook = pgds_shmem_startup;
