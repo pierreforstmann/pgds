@@ -3,7 +3,7 @@
 MODULES = pgds
 
 EXTENSION = pgds
-DATA = pgds--0.0.1.sql
+DATA = pgds--0.0.2.sql
 PGFILEDESC = "pgds - DS"
 
 # run: make clean + make + make install + make installcheck
@@ -16,4 +16,4 @@ PGXS := $(shell $(PG_CONFIG) --pgxs)
 include $(PGXS)
 
 pgxn:
-	git archive --format zip  --output ../pgxn/pgds/pgds-0.0.1.zip main 
+	git archive --format zip  --output ../pgxn/pgds/pgds-0.0.2.zip main 
