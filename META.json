@@ -1,7 +1,8 @@
 {
    "name": "pgds",
    "abstract": "dynamic statistics",
-   "version": "0.0.2",
+   "version": "0.0.3",
+   "release_status":"testing",
    "maintainer": [
       "Pierre Forstmann"
    ],
@@ -23,7 +24,7 @@
          "abstract": "dynamic statistics",
          "file": "pgds.c",
          "docfile": "README.md",
-         "version": "0.0.2"
+         "version": "0.0.3"
       }
    },
    "resources": {
