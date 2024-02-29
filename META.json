@@ -19,7 +19,7 @@
       }
    },
    "provides": {
-     "pg_readonly": {
+     "pgds": {
          "abstract": "dynamic statistics",
          "file": "pgds.c",
          "docfile": "README.md",
