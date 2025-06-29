@@ -29,7 +29,7 @@ And following SQL statement should be run:
 `create extension pgds;`
 <br>
 
-pgds has been successfully tested with PostgreSQL 12, 13, 14, 15 and 16.
+pgds has been successfully tested with PostgreSQL 12, 13, 14, 15, 16 and 17:
 
 ## Usage
 
