@@ -1,6 +1,6 @@
 # pgds
 
-PostgreSQL extension to gather dynamic statistics
+PostgreSQL extension to gather dynamic statistics on tables
 
 ## Compiling
 
@@ -29,11 +29,15 @@ And following SQL statement should be run:
 `create extension pgds;`
 <br>
 
-pgds has been successfully tested with PostgreSQL 12, 13, 14, 15, 16 and 17:
+pgds has been successfully tested with PostgreSQL 12, 13, 14, 15, 16 and 17.
 
 ## Usage
 
 pgds has no GUC parameter.
 
-pgds parses tables used in SQL statements, check whether statistics exists for these tables and if not, run ANALYZE statement if the user executing the query is the owner of the table.
+What it does:
+
+- it parses tables used in SQL statements
+- it checks whether statistics exists for these tables 
+- if not, runs ANALYZE statement if the user executing the query is the owner of the table.
 
