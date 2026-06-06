@@ -616,8 +616,14 @@ static void pgds_analyze_table(int index)
     if (strcmp(count_val, "0") == 0) 
 	{
 		initStringInfo(&buf_analyze);
-		appendStringInfo(&buf_analyze, "analyze verbose %s;", pgds_tablename_array[index]);
-		elog(DEBUG1,"pgds: pgds_analyze_table: analyze: %s", pgds_tablename_array[index]);
+                /*
+                ** avoid ANALYZE VERBOSE because PG 18 has more output then previous versions
+                */
+		appendStringInfo(&buf_analyze, "analyze %s;", pgds_tablename_array[index]);
+                /*
+                ** replace DEBUG1 by NOTICE after removing VERBOSE option for ANALYZE
+                */
+		elog(NOTICE,"pgds: pgds_analyze_table: analyze: %s", pgds_tablename_array[index]);
 		ret = SPI_execute(buf_analyze.data, false, 0);
 		if (ret != SPI_OK_UTILITY)
 			elog(FATAL, "cannot run analyze for %s: error code %d", pgds_tablename_array[index], ret);

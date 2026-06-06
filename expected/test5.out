@@ -9,9 +9,7 @@ for values from ('2020-01-01') to ('2020-12-31');
 --
 --
 select min(y) from t500;
-INFO:  analyzing "public.t500" inheritance tree
-INFO:  analyzing "public.t500_2020"
-INFO:  "t500_2020": scanned 0 of 0 pages, containing 0 live rows and 0 dead rows; 0 rows in sample, 0 estimated total rows
+NOTICE:  pgds: pgds_analyze_table: analyze: t500
   min   
 --------
  (null)
@@ -26,13 +24,7 @@ for values from ('2022-01-01') to ('2022-12-31');
 --
 --
 select max(y) from t500;
-INFO:  analyzing "public.t500" inheritance tree
-INFO:  analyzing "public.t500_2020"
-INFO:  "t500_2020": scanned 0 of 0 pages, containing 0 live rows and 0 dead rows; 0 rows in sample, 0 estimated total rows
-INFO:  analyzing "public.t500_2021"
-INFO:  "t500_2021": scanned 0 of 0 pages, containing 0 live rows and 0 dead rows; 0 rows in sample, 0 estimated total rows
-INFO:  analyzing "public.t500_2022"
-INFO:  "t500_2022": scanned 0 of 0 pages, containing 0 live rows and 0 dead rows; 0 rows in sample, 0 estimated total rows
+NOTICE:  pgds: pgds_analyze_table: analyze: t500
   max   
 --------
  (null)

@@ -5,40 +5,31 @@
 create table t21 (x int);
 create table t22 (x int);
 create view v23 as select * from t21 union select * from t22;
-INFO:  analyzing "public.t21"
-INFO:  "t21": scanned 0 of 0 pages, containing 0 live rows and 0 dead rows; 0 rows in sample, 0 estimated total rows
-INFO:  analyzing "public.t22"
-INFO:  "t22": scanned 0 of 0 pages, containing 0 live rows and 0 dead rows; 0 rows in sample, 0 estimated total rows
+NOTICE:  pgds: pgds_analyze_table: analyze: t21
+NOTICE:  pgds: pgds_analyze_table: analyze: t22
 --
 begin;
 select * from v23;
-INFO:  analyzing "public.t22"
-INFO:  "t22": scanned 0 of 0 pages, containing 0 live rows and 0 dead rows; 0 rows in sample, 0 estimated total rows
-INFO:  analyzing "public.t21"
-INFO:  "t21": scanned 0 of 0 pages, containing 0 live rows and 0 dead rows; 0 rows in sample, 0 estimated total rows
+NOTICE:  pgds: pgds_analyze_table: analyze: t22
+NOTICE:  pgds: pgds_analyze_table: analyze: t21
  x 
 ---
 (0 rows)
 
 insert into t21 values(1);
-INFO:  analyzing "public.t21"
-INFO:  "t21": scanned 0 of 0 pages, containing 0 live rows and 0 dead rows; 0 rows in sample, 0 estimated total rows
+NOTICE:  pgds: pgds_analyze_table: analyze: t21
 select * from v23;
-INFO:  analyzing "public.t22"
-INFO:  "t22": scanned 0 of 0 pages, containing 0 live rows and 0 dead rows; 0 rows in sample, 0 estimated total rows
-INFO:  analyzing "public.t21"
-INFO:  "t21": scanned 1 of 1 pages, containing 1 live rows and 0 dead rows; 1 rows in sample, 1 estimated total rows
+NOTICE:  pgds: pgds_analyze_table: analyze: t22
+NOTICE:  pgds: pgds_analyze_table: analyze: t21
  x 
 ---
  1
 (1 row)
 
 insert into t22 values(2);
-INFO:  analyzing "public.t22"
-INFO:  "t22": scanned 0 of 0 pages, containing 0 live rows and 0 dead rows; 0 rows in sample, 0 estimated total rows
+NOTICE:  pgds: pgds_analyze_table: analyze: t22
 select * from v23;
-INFO:  analyzing "public.t22"
-INFO:  "t22": scanned 1 of 1 pages, containing 1 live rows and 0 dead rows; 1 rows in sample, 1 estimated total rows
+NOTICE:  pgds: pgds_analyze_table: analyze: t22
  x 
 ---
  1
